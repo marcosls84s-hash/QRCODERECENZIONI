@@ -26,7 +26,7 @@
         #privateForm { display: none; margin-top: 20px; text-align: left; }
         select, textarea { width: 100%; padding: 15px; border-radius: 15px; border: 1px solid #ddd; margin-bottom: 15px; font-family: inherit; font-size: 14px; box-sizing: border-box; }
         textarea { height: 100px; resize: none; }
-        .btn-send { background: var(--primary); color: white; border: none; padding: 15px; border-radius: 15px; font-weight: 800; width: 100%; font-size: 16px; }
+        .btn-send { background: var(--primary); color: white; border: none; padding: 15px; border-radius: 15px; font-weight: 800; width: 100%; font-size: 16px; cursor: pointer; }
         
         .success-msg { display: none; color: var(--success); font-weight: bold; }
     </style>
@@ -52,14 +52,15 @@
             <h2 style="font-size: 18px; color: var(--red);">Cosa non ti è piaciuto?</h2>
             <p style="margin-bottom: 15px;">Il tuo messaggio arriverà in privato al titolare per permetterci di migliorare.</p>
             
+            <label style="font-size: 12px; font-weight: bold; color: #999;">TIPO DI SERVIZIO</label>
             <select id="mealType">
                 <option value="PRANZO">PRANZO</option>
                 <option value="CENA">CENA</option>
             </select>
 
-            <textarea id="comment" placeholder="Scrivi qui il tuo suggerimento o lamentela..."></textarea>
+            <textarea id="comment" placeholder="Scrivi qui la tua segnalazione..."></textarea>
             
-            <button class="btn-send" onclick="sendToStaff()">INVIA AL TITOLARE</button>
+            <button id="btnSubmit" class="btn-send" onclick="sendToStaff()">INVIA SEGNALAZIONE</button>
         </div>
 
         <div id="success" class="success-msg">
@@ -73,10 +74,11 @@
         firebase.initializeApp(config);
         const db = firebase.database();
 
-        // Legge parametri dall'URL
+        // LEGGE TUTTI I PARAMETRI DALL'APP ANDROID
         const params = new URLSearchParams(window.location.search);
         const resId = params.get('res');
-        const tableId = params.get('res_table') || params.get('table') || "0";
+        const tableNum = params.get('table') || "0";
+        const waiterName = params.get('waiter') || "Staff"; // RECUPERA IL CAMERIERE
         const googleUrl = params.get('google');
         let selectedRating = 0;
 
@@ -89,12 +91,10 @@
         function handleStar(rating) {
             selectedRating = rating;
             if (rating >= 4) {
-                // RECENSIONE POSITIVA -> GOOGLE
                 alert("Grazie mille! Ti stiamo portando sulla nostra pagina Google per condividere il tuo entusiasmo.");
                 if (googleUrl) window.location.href = decodeURIComponent(googleUrl);
-                else alert("Recensione inviata con successo!");
+                else alert("Recensione inviata!");
             } else {
-                // RECENSIONE NEGATIVA -> MODULO PRIVATO
                 document.getElementById('step1').style.display = 'none';
                 document.getElementById('privateForm').style.display = 'block';
             }
@@ -103,13 +103,17 @@
         function sendToStaff() {
             const comment = document.getElementById('comment').value;
             const meal = document.getElementById('mealType').value;
+            const btn = document.getElementById('btnSubmit');
 
             if (!comment.trim()) {
                 alert("Per favore, scrivi un breve commento.");
                 return;
             }
 
-            // Invia alla Bacheca (Staff Board) dell'App
+            btn.disabled = true;
+            btn.innerText = "Invio in corso...";
+
+            // INVIA TUTTI I DATI ALLA BACHECA (Data, Tavolo, Cameriere, Stelle, Messaggio)
             const boardRef = db.ref("restaurants/" + resId + "/staff_board").push();
             boardRef.set({
                 id: boardRef.key,
@@ -117,12 +121,17 @@
                 text: comment,
                 timestamp: Date.now(),
                 isFeedback: true,
-                tableNumber: parseInt(tableId),
+                tableNumber: parseInt(tableNum),
                 mealType: meal,
-                rating: selectedRating
+                rating: selectedRating,
+                servedBy: waiterName // SALVA IL CAMERIERE CHE HA SEGUITO IL TAVOLO
             }).then(() => {
                 document.getElementById('privateForm').style.display = 'none';
                 document.getElementById('success').style.display = 'block';
+            }).catch(() => {
+                alert("Errore di invio. Riprova.");
+                btn.disabled = false;
+                btn.innerText = "INVIA SEGNALAZIONE";
             });
         }
     </script>
